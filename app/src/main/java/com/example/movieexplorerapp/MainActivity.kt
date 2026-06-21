@@ -5,17 +5,40 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+
 
 class MainActivity : ComponentActivity() {
 
@@ -23,8 +46,26 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+
+            var loggedIn by remember {
+                mutableStateOf(
+                    FirebaseAuth.getInstance().currentUser != null
+                )
+            }
+
             MaterialTheme {
-                MovieScreen()
+
+                if (loggedIn) {
+                    MovieScreen(
+                        onLogout = {
+                            loggedIn = false
+                        }
+                    )
+                } else {
+                    LoginScreen {
+                        loggedIn = true
+                    }
+                }
             }
         }
     }
@@ -32,7 +73,9 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MovieScreen() {
+fun MovieScreen(
+    onLogout: () -> Unit
+) {
 
     var movies by remember { mutableStateOf<List<Movie>>(emptyList()) }
     var filteredMovies by remember { mutableStateOf<List<Movie>>(emptyList()) }
@@ -40,13 +83,16 @@ fun MovieScreen() {
     var searchText by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
+    var favorites by remember {
+        mutableStateOf(setOf<String>())
+    }
 
     LaunchedEffect(Unit) {
         try {
             movies = RetrofitInstance.api.getMovies()
             filteredMovies = movies
             isLoading = false
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             error = "Failed to load movies"
             isLoading = false
         }
@@ -76,8 +122,23 @@ fun MovieScreen() {
             text = "Browse Studio Ghibli Movies",
             fontSize = 14.sp
         )
+        Text(
+            text = "❤️ Favorites: ${favorites.size}",
+            fontSize = 14.sp,
+            color = Color.Red
+        )
+
 
         Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = {
+                FirebaseAuth.getInstance().signOut()
+                onLogout()
+            }
+        ) {
+            Text("Logout")
+        }
 
         OutlinedTextField(
             value = searchText,
@@ -177,12 +238,35 @@ fun MovieScreen() {
                                 modifier = Modifier.padding(16.dp)
                             ) {
 
-                                Text(
-                                    text = movie.title,
-                                    fontSize = 24.sp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
 
+                                    Text(
+                                        text = movie.title,
+                                        fontSize = 24.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    TextButton(
+                                        onClick = {
+                                            favorites =
+                                                if (favorites.contains(movie.title))
+                                                    favorites - movie.title
+                                                else
+                                                    favorites + movie.title
+                                        }
+                                    ) {
+                                        Text(
+                                            if (favorites.contains(movie.title))
+                                                "❤️"
+                                            else
+                                                "🤍"
+                                        )
+                                    }
+                                }
                                 Spacer(
                                     modifier = Modifier.height(6.dp)
                                 )
